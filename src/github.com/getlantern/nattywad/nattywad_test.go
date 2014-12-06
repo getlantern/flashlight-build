@@ -21,7 +21,21 @@ func TestRoundTrip(t *testing.T) {
 
 	serverIdCh := make(chan waddell.PeerId)
 
+	wc, err := waddell.NewClient(&waddell.ClientConfig{
+		Dial: func() (net.Conn, error) {
+			return net.Dial("tcp", waddellAddr)
+		},
+		ServerCert: DefaultWaddellCert,
+		OnId: func(id waddell.PeerId) {
+			serverIdCh <- id
+		},
+	})
+	if err != nil {
+		t.Fatalf("Unable to start waddell client: %s", err)
+	}
+
 	server := &Server{
+		Client: wc,
 		OnSuccess: func(local *net.UDPAddr, remote *net.UDPAddr) bool {
 			log.Debugf("Success! %s -> %s", local, remote)
 			wg.Done()
@@ -31,17 +45,19 @@ func TestRoundTrip(t *testing.T) {
 			t.Errorf("Server - Traversal failed: %s", err)
 			wg.Done()
 		},
-		OnConnect: func(id waddell.PeerId) {
-			serverIdCh <- id
-		},
 	}
-	go server.Configure(waddellAddr, DefaultWaddellCert)
+	server.Start()
 
-	client := &Client{
-		DialWaddell: func(addr string) (net.Conn, error) {
+	clientMgr := &waddell.ClientMgr{
+		Dial: func(addr string) (net.Conn, error) {
 			return net.Dial("tcp", addr)
 		},
-		ServerCert: DefaultWaddellCert,
+		ServerCert:        DefaultWaddellCert,
+		ReconnectAttempts: 10,
+	}
+
+	client := &Client{
+		ClientMgr: clientMgr,
 		OnSuccess: func(info *TraversalInfo) {
 			log.Debugf("Client - Success! %s", spew.Sdump(info))
 			wg.Done()
