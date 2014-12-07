@@ -3,8 +3,6 @@ package deepcopy
 import (
 	"reflect"
 	"testing"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 type A struct {
@@ -45,7 +43,6 @@ func TestCopy(t *testing.T) {
 		},
 	}
 	err := Copy(dst, src)
-	t.Log(spew.Sdump(dst))
 	if err != nil {
 		t.Errorf("Unable to copy!")
 	}
