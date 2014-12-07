@@ -11,18 +11,23 @@ function die() {
 
 export GOPATH=`pwd`:$GOPATH
 
-# Remove profile.cov from previous run if necessary
-if [ -e profile.cov ]
-then
-    rm profile.cov
-fi
+# Initialize profile.cov
+cat "mode: count" > profile.cov
+
+# Initialize error tracking
+ERROR=""
 
 # Test each package and append coverage profile info to profile.cov
 for pkg in `cat testpackages.txt`
 do
     #$HOME/gopath/bin/
-    go test -v -covermode=count -coverprofile=profile_tmp.cov $pkg || die "Error testing $pkg"
-    tail -n +2 profile_tmp.cov >> profile.cov || die "Error appending coverage for $pkg to profile.cov"
+    go test -v -covermode=count -coverprofile=profile_tmp.cov $pkg || ERROR="Error testing $pkg"
+    tail -n +2 profile_tmp.cov >> profile.cov || die "Unable to append coverage for $pkg"
 done
+
+if [ ! -z "$ERROR" ]
+then
+    die "Encountered error, last error was: $ERROR"
+fi
 
 #- GOPATH=`pwd`:$GOPATH $HOME/gopath/bin/goveralls -v -service travis-ci github.com/getlantern/buuid
