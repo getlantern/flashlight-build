@@ -12,7 +12,7 @@ function die() {
 export GOPATH=`pwd`:$GOPATH
 
 # Initialize profile.cov
-cat "mode: count" > profile.cov
+echo "mode: count" > profile.cov
 
 # Initialize error tracking
 ERROR=""
