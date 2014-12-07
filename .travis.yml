@@ -14,7 +14,7 @@ script:
   - GOPATH=`pwd`:$GOPATH $HOME/gopath/bin/goveralls -v -service travis-ci github.com/getlantern/connpool
   - GOPATH=`pwd`:$GOPATH $HOME/gopath/bin/goveralls -v -service travis-ci github.com/getlantern/deepcopy
   - GOPATH=`pwd`:$GOPATH $HOME/gopath/bin/goveralls -v -service travis-ci github.com/getlantern/enproxy
-  - GOPATH=`pwd`:$GOPATH $HOME/gopath/bin/goveralls -v -service travis-ci github.com/getlantern/eventsource
+#  - GOPATH=`pwd`:$GOPATH $HOME/gopath/bin/goveralls -v -service travis-ci github.com/getlantern/eventsource
   - GOPATH=`pwd`:$GOPATH $HOME/gopath/bin/goveralls -v -service travis-ci github.com/getlantern/framed
   - GOPATH=`pwd`:$GOPATH $HOME/gopath/bin/goveralls -v -service travis-ci github.com/getlantern/golog
   - GOPATH=`pwd`:$GOPATH $HOME/gopath/bin/goveralls -v -service travis-ci github.com/getlantern/idletiming
