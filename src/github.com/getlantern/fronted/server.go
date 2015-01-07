@@ -11,6 +11,7 @@ import (
 	"github.com/getlantern/enproxy"
 	"github.com/getlantern/idletiming"
 	"github.com/getlantern/keyman"
+	"github.com/spacemonkeygo/openssl"
 )
 
 var (
@@ -50,8 +51,11 @@ type Server struct {
 	// WriteTimeout: (optional) timeout for write ops
 	WriteTimeout time.Duration
 
-	// CertContext for server's certificates. If nil, the server will use
-	// unencrypted connections instead of TLS.
+	// ListenWithOpenSSL: whether to use OpenSSL to listen for incoming
+	// connections.
+	ListenWithOpenSSL bool
+
+	// CertContext for server's certificates.
 	CertContext *CertContext
 
 	// TLSConfig: tls configuration to use on inbound connections. If nil, will
@@ -99,10 +103,10 @@ func (server *Server) Listen() (net.Listener, error) {
 }
 
 func (server *Server) listen() (net.Listener, error) {
-	if server.CertContext != nil {
-		return server.listenTLS()
+	if server.ListenWithOpenSSL {
+		return server.listenOpenSSL()
 	} else {
-		return server.listenUnencrypted()
+		return server.listenTLS()
 	}
 }
 
@@ -134,12 +138,23 @@ func (server *Server) listenTLS() (net.Listener, error) {
 	return listener, err
 }
 
-func (server *Server) listenUnencrypted() (net.Listener, error) {
-	listener, err := net.Listen("tcp", server.Addr)
+func (server *Server) listenOpenSSL() (net.Listener, error) {
+	host, _, err := net.SplitHostPort(server.Addr)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to listen for unencrypted connections at %s: %s", server.Addr, err)
+		return nil, fmt.Errorf("Unable to split host and port for %v: %v", server.Addr, err)
 	}
-
+	err = server.CertContext.InitServerCert(host)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to init server cert: %s", err)
+	}
+	ctx, err := openssl.NewCtxFromFiles(server.CertContext.ServerCertFile, server.CertContext.PKFile)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to create OpenSSL context: %s", err)
+	}
+	listener, err := openssl.Listen("tcp", server.Addr, ctx)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to listen for tls connections with OpenSSL at %s: %s", server.Addr, err)
+	}
 	return listener, err
 }
 

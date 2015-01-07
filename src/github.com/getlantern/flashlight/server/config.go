@@ -1,8 +1,9 @@
 package server
 
 type ServerConfig struct {
-	// Unencrypted: Whether or not to run in unencrypted mode (no TLS)
-	Unencrypted bool
+	// ListenWithOpenSSL: whether to use OpenSSL (as opposed to crypto/tls)
+	// for listening.
+	ListenWithOpenSSL bool
 
 	// Country: 2 letter country code
 	Country string
