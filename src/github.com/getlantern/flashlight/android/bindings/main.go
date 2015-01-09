@@ -4,10 +4,10 @@
 package bindings
 
 import (
+	// "github.com/getlantern/flashlight/statreporter"
+	// "github.com/getlantern/flashlight/statserver"
 	"github.com/getlantern/flashlight/client"
 	"github.com/getlantern/flashlight/config"
-	"github.com/getlantern/flashlight/statreporter"
-	"github.com/getlantern/flashlight/statserver"
 	"github.com/getlantern/golog"
 	"math/rand"
 	"time"
@@ -32,7 +32,9 @@ func init() {
 		log.Fatalf("Unable to start configuration: %s", err)
 	}
 
-	configureStats(cfg, true)
+	// configureStats(cfg, true)
+
+	cfg.Role = "client"
 }
 
 func RunClientProxy(listenAddr string) (err error) {
@@ -52,7 +54,7 @@ func RunClientProxy(listenAddr string) (err error) {
 		for {
 			cfg := <-configUpdates
 			// TODO: We don't need this yet, this is a PoC.
-			configureStats(cfg, false)
+			// configureStats(cfg, false)
 
 			client.Configure(cfg.Client)
 		}
@@ -65,18 +67,18 @@ func RunClientProxy(listenAddr string) (err error) {
 	return nil
 }
 
-func configureStats(cfg *config.Config, failOnError bool) {
-	err := statreporter.Configure(cfg.Stats)
-	if err != nil {
-		log.Error(err)
-		if failOnError {
-			log.Fatalf("Config error.")
-		}
-	}
-
-	if cfg.StatsAddr != "" {
-		statserver.Start(cfg.StatsAddr)
-	} else {
-		statserver.Stop()
-	}
-}
+// func configureStats(cfg *config.Config, failOnError bool) {
+// 	err := statreporter.Configure(cfg.Stats)
+// 	if err != nil {
+// 		log.Error(err)
+// 		if failOnError {
+// 			log.Fatalf("Config error.")
+// 		}
+// 	}
+//
+// 	if cfg.StatsAddr != "" {
+// 		statserver.Start(cfg.StatsAddr)
+// 	} else {
+// 		statserver.Stop()
+// 	}
+// }
