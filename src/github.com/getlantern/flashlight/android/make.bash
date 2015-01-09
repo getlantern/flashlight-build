@@ -16,5 +16,5 @@ ANDROID_APP=$PWD
 (cd $GOPATH/src/golang.org/x/mobile && ln -sf $PWD/bind/java/Seq.java $ANDROID_APP/src/go)
 CGO_ENABLED=1 GOOS=android GOARCH=arm GOARM=7 \
 	go build -ldflags="-shared" .
-mv -f bindings libs/armeabi-v7a/libgojni.so
+mv -f android libs/armeabi-v7a/libgojni.so
 ant debug
