@@ -10,10 +10,6 @@ if [ ! -f make.bash ]; then
 	exit 1
 fi
 
-mkdir -p bindings/go_bindings
-gobind -lang=go github.com/getlantern/flashlight/android/bindings > bindings/go_bindings/go_bindings.go
-gobind -lang=java github.com/getlantern/flashlight/android/bindings > bindings/Bindings.java
-
 mkdir -p libs/armeabi-v7a src/go/flashlight
 ANDROID_APP=$PWD
 (cd $GOPATH/src/golang.org/x/mobile && ln -sf $PWD/app/*.java $ANDROID_APP/src/go)
