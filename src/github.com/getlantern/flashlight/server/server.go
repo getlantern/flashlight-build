@@ -6,18 +6,15 @@ import (
 	"net/http"
 	"os"
 	"reflect"
-	"strconv"
 	"sync"
 	"time"
 
 	"github.com/getlantern/fronted"
-	"github.com/getlantern/go-igdman/igdman"
 	"github.com/getlantern/golog"
 	"github.com/getlantern/nattywad"
 	"github.com/getlantern/waddell"
 
 	"github.com/getlantern/flashlight/globals"
-	"github.com/getlantern/flashlight/nattest"
 	"github.com/getlantern/flashlight/statreporter"
 	"github.com/getlantern/flashlight/statserver"
 )
@@ -136,93 +133,6 @@ func (server *Server) ListenAndServe() error {
 		return fmt.Errorf("Unable to listen at %s: %s", server.Addr, err)
 	}
 	return fs.Serve(l)
-}
-
-func (server *Server) startNattywad(waddellAddr string) {
-	log.Debugf("Connecting to waddell at: %s", waddellAddr)
-	var err error
-	server.waddellClient, err = waddell.NewClient(&waddell.ClientConfig{
-		Dial: func() (net.Conn, error) {
-			return net.Dial("tcp", waddellAddr)
-		},
-		ServerCert:        globals.WaddellCert,
-		ReconnectAttempts: 10,
-		OnId: func(id waddell.PeerId) {
-			log.Debugf("Connected to Waddell!! Id is: %s", id)
-		},
-	})
-	if err != nil {
-		log.Errorf("Unable to connect to waddell: %s", err)
-		server.waddellClient = nil
-		return
-	}
-	server.nattywadServer = &nattywad.Server{
-		Client: server.waddellClient,
-		OnSuccess: func(local *net.UDPAddr, remote *net.UDPAddr) bool {
-			err := nattest.Serve(local)
-			if err != nil {
-				log.Error(err.Error())
-				return false
-			}
-			return true
-		},
-	}
-	server.nattywadServer.Start()
-}
-
-func (server *Server) stopNattywad() {
-	log.Debug("Stopping nattywad server")
-	server.nattywadServer.Stop()
-	server.nattywadServer = nil
-	log.Debug("Stopping waddell client")
-	server.waddellClient.Close()
-	server.waddellClient = nil
-}
-
-func mapPort(addr string, port int) error {
-	internalIP, internalPortString, err := net.SplitHostPort(addr)
-	if err != nil {
-		return fmt.Errorf("Unable to split host and port for %v: %v", addr, err)
-	}
-
-	internalPort, err := strconv.Atoi(internalPortString)
-	if err != nil {
-		return fmt.Errorf("Unable to parse local port: ")
-	}
-
-	if internalIP == "" {
-		internalIP, err = determineInternalIP()
-		if err != nil {
-			return fmt.Errorf("Unable to determine internal IP: %s", err)
-		}
-	}
-
-	igd, err := igdman.NewIGD()
-	if err != nil {
-		return fmt.Errorf("Unable to get IGD: %s", err)
-	}
-
-	igd.RemovePortMapping(igdman.TCP, port)
-	err = igd.AddPortMapping(igdman.TCP, internalIP, internalPort, port, 0)
-	if err != nil {
-		return fmt.Errorf("Unable to map port with igdman %d: %s", port, err)
-	}
-
-	return nil
-}
-
-func unmapPort(port int) error {
-	igd, err := igdman.NewIGD()
-	if err != nil {
-		return fmt.Errorf("Unable to get IGD: %s", err)
-	}
-
-	igd.RemovePortMapping(igdman.TCP, port)
-	if err != nil {
-		return fmt.Errorf("Unable to unmap port with igdman %d: %s", port, err)
-	}
-
-	return nil
 }
 
 // determineInternalIP determines the internal IP to use for mapping ports. It
