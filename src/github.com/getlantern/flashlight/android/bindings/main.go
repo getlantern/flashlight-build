@@ -18,28 +18,20 @@ func init() {
 }
 
 var (
-	log           = golog.LoggerFor("flashlight")
-	cfg           *config.Config
-	configUpdates = make(chan *config.Config)
+	log = golog.LoggerFor("flashlight")
 )
 
-func init() {
-	var err error
-	cfg, err = config.Start(func(updated *config.Config) {
-		configUpdates <- updated
-	})
-	if err != nil {
-		log.Fatalf("Unable to start configuration: %s", err)
+func RunClientProxy(listenAddr string) (err error) {
+	var cfg *config.Config
+
+	cfg = new(config.Config)
+	cfg = &config.Config{
+		Role:   "client",
+		Client: &client.ClientConfig{},
+		Addr:   listenAddr,
 	}
 
-	// configureStats(cfg, true)
-
-	cfg.Role = "client"
-}
-
-func RunClientProxy(listenAddr string) (err error) {
-
-	cfg.Addr = listenAddr
+	cfg.ApplyDefaults()
 
 	client := &client.Client{
 		Addr:         cfg.Addr,
@@ -48,17 +40,6 @@ func RunClientProxy(listenAddr string) (err error) {
 	}
 
 	client.Configure(cfg.Client)
-
-	// Continually poll for config updates and update client accordingly
-	go func() {
-		for {
-			cfg := <-configUpdates
-			// TODO: We don't need this yet, this is a PoC.
-			// configureStats(cfg, false)
-
-			client.Configure(cfg.Client)
-		}
-	}()
 
 	if err = client.ListenAndServe(); err != nil {
 		return err

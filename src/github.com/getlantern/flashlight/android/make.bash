@@ -12,9 +12,10 @@ fi
 
 mkdir -p libs/armeabi-v7a src/go/flashlight
 ANDROID_APP=$PWD
-(cd $GOPATH/src/golang.org/x/mobile && ln -sf $PWD/app/*.java $ANDROID_APP/src/go)
-(cd $GOPATH/src/golang.org/x/mobile && ln -sf $PWD/bind/java/Seq.java $ANDROID_APP/src/go)
+(cd $GOPATH/src/golang.org/x/mobile && cp $PWD/app/*.java $ANDROID_APP/src/go)
+(cd $GOPATH/src/golang.org/x/mobile && cp $PWD/bind/java/Seq.java $ANDROID_APP/src/go)
 CGO_ENABLED=1 GOOS=android GOARCH=arm GOARM=7 \
 	go build -ldflags="-shared" .
 mv -f android libs/armeabi-v7a/libgojni.so
+cp ./bindings/Bindings.java src/go/flashlight
 ant debug
