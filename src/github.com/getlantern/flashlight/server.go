@@ -1,4 +1,7 @@
-// +build darwin dragonfly freebsd !android,linux netbsd openbsd solaris
+// This file is used to provide the full runServerProxy functionality on most
+// systems.
+//
+// +build darwin dragonfly freebsd !android,linux netbsd openbsd solaris windows
 
 package main
 
@@ -8,7 +11,7 @@ import (
 	"github.com/getlantern/fronted"
 )
 
-// Runs the server-side proxy
+// runServerProxy runs the server-side proxy
 func runServerProxy(cfg *config.Config) {
 	useAllCores()
 

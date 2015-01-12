@@ -1,3 +1,5 @@
+// This file is used to provide igdman functionality on most systems.
+//
 // +build windows darwin freebsd openbsd !android,linux
 
 package server
@@ -9,6 +11,7 @@ import (
 	"strconv"
 )
 
+// mapPort adds port mapping.
 func mapPort(addr string, port int) error {
 	internalIP, internalPortString, err := net.SplitHostPort(addr)
 	if err != nil {
@@ -41,6 +44,7 @@ func mapPort(addr string, port int) error {
 	return nil
 }
 
+// unmapPort removes port mapping.
 func unmapPort(port int) error {
 	igd, err := igdman.NewIGD()
 	if err != nil {

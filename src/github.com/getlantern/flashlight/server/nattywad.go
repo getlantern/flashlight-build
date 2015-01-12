@@ -1,4 +1,6 @@
-// +build darwin dragonfly freebsd !android,linux netbsd openbsd solaris
+// This file is used to provide nattywad functionality on most systems.
+//
+// +build darwin dragonfly freebsd !android,linux netbsd openbsd solaris windows
 
 package server
 
@@ -10,6 +12,8 @@ import (
 	"net"
 )
 
+// startNattywad stars a nattywad server to provide NAT traversal
+// functionality.
 func (server *Server) startNattywad(waddellAddr string) {
 	log.Debugf("Connecting to waddell at: %s", waddellAddr)
 	var err error
@@ -42,6 +46,7 @@ func (server *Server) startNattywad(waddellAddr string) {
 	server.nattywadServer.Start()
 }
 
+// stopNattywad stops the nattywad server.
 func (server *Server) stopNattywad() {
 	log.Debug("Stopping nattywad server")
 	server.nattywadServer.Stop()
