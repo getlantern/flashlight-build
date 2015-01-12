@@ -37,7 +37,11 @@ var (
 func init() {
 	nattyBytes, err := bin.Asset("natty")
 	if err != nil {
-		panic(fmt.Errorf("Unable to read natty bytes: %s", err))
+		// Preventing from panicking on devices that do not support natty, such as
+		// android.
+		// panic(fmt.Errorf("Unable to read natty bytes: %s", err))
+		log.Debugf("Unable to read natty bytes: %q", err)
+		return
 	}
 
 	nattybe, err = byteexec.New(nattyBytes, "natty")
