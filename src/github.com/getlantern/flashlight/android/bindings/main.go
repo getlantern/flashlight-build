@@ -1,15 +1,14 @@
-// package bindings provides minimal configuration for spawning a flashlight
+// package flashlight provides minimal configuration for spawning a flashlight
 // client.
 
-package bindings
+package flashlight
 
 import (
-	// "github.com/getlantern/flashlight/statreporter"
-	// "github.com/getlantern/flashlight/statserver"
 	"github.com/getlantern/flashlight/client"
 	"github.com/getlantern/flashlight/config"
 	"github.com/getlantern/golog"
 	"math/rand"
+	"os"
 	"time"
 )
 
@@ -21,6 +20,14 @@ var (
 	log = golog.LoggerFor("flashlight")
 )
 
+// StopClientProxy should stop the client.
+func StopClientProxy() {
+	// TODO: We only want to stop the proxy, not to bring down the whole process.
+	os.Exit(0)
+}
+
+// RunClientProxy creates a new client at the given address. If an active
+// client is found it kill the client before starting a new one.
 func RunClientProxy(listenAddr string) (err error) {
 	var cfg *config.Config
 
@@ -42,24 +49,8 @@ func RunClientProxy(listenAddr string) (err error) {
 	client.Configure(cfg.Client)
 
 	if err = client.ListenAndServe(); err != nil {
-		return err
+		panic(err.Error())
 	}
 
 	return nil
 }
-
-// func configureStats(cfg *config.Config, failOnError bool) {
-// 	err := statreporter.Configure(cfg.Stats)
-// 	if err != nil {
-// 		log.Error(err)
-// 		if failOnError {
-// 			log.Fatalf("Config error.")
-// 		}
-// 	}
-//
-// 	if cfg.StatsAddr != "" {
-// 		statserver.Start(cfg.StatsAddr)
-// 	} else {
-// 		statserver.Stop()
-// 	}
-// }
