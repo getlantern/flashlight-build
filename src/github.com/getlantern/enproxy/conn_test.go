@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getlantern/fdcount"
 	"github.com/getlantern/keyman"
-
 	"github.com/getlantern/testify/assert"
 	. "github.com/getlantern/waitforserver"
 )
@@ -25,9 +25,7 @@ const (
 var (
 	pk   *keyman.PrivateKey
 	cert *keyman.Certificate
-)
 
-var (
 	proxyAddr     = ""
 	httpAddr      = ""
 	httpsAddr     = ""
@@ -62,18 +60,80 @@ func TestBadBuffered(t *testing.T) {
 	doTestBad(true, t)
 }
 
+func TestIdle(t *testing.T) {
+	idleTimeout := 100 * time.Millisecond
+
+	_, counter, err := fdcount.Matching("TCP")
+	if err != nil {
+		t.Fatalf("Unable to get fdcount: %v", err)
+	}
+
+	_, err = Dial(httpAddr, &Config{
+		DialProxy: func(addr string) (net.Conn, error) {
+			return net.Dial("tcp", proxyAddr)
+		},
+		NewRequest:  newRequest,
+		IdleTimeout: idleTimeout,
+	})
+	if assert.NoError(t, err, "Dialing should have succeeded") {
+		time.Sleep(idleTimeout * 2)
+		assert.NoError(t, counter.AssertDelta(2), "All file descriptors except the connection from proxy to destination site should have been closed")
+	}
+}
+
+// This test stimulates a connection leak as seen in
+// https://github.com/getlantern/lantern/issues/2174.
+func TestHTTPRedirect(t *testing.T) {
+	startProxy(t)
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Dial: func(network, addr string) (net.Conn, error) {
+				return Dial(addr, &Config{
+					DialProxy: func(addr string) (net.Conn, error) {
+						return net.Dial("tcp", proxyAddr)
+					},
+					NewRequest: newRequest,
+				})
+			},
+			DisableKeepAlives: true,
+		},
+	}
+
+	_, counter, err := fdcount.Matching("TCP")
+	if err != nil {
+		t.Fatalf("Unable to get fdcount: %v", err)
+	}
+
+	resp, err := client.Head("http://www.facebook.com")
+	if assert.NoError(t, err, "Head request to facebook should have succeeded") {
+		resp.Body.Close()
+	}
+
+	assert.NoError(t, counter.AssertDelta(2), "All file descriptors except the connection from proxy to destination site should have been closed")
+}
+
 func doTestPlainText(buffered bool, t *testing.T) {
 	startServers(t)
+
+	_, counter, err := fdcount.Matching("TCP")
+	if err != nil {
+		t.Fatalf("Unable to get fdcount: %v", err)
+	}
 
 	conn, err := prepareConn(httpAddr, buffered, false, t)
 	if err != nil {
 		t.Fatalf("Unable to prepareConn: %s", err)
 	}
-	defer conn.Close()
+	defer func() {
+		err := conn.Close()
+		assert.Nil(t, err, "Closing conn should succeed")
+		assert.NoError(t, counter.AssertDelta(2), "All file descriptors except the connection from proxy to destination site should have been closed")
+	}()
 
 	doRequests(conn, t)
 
-	assert.Equal(t, 226, bytesReceived, "Wrong number of bytes received")
+	assert.Equal(t, 166, bytesReceived, "Wrong number of bytes received")
 	assert.Equal(t, 284, bytesSent, "Wrong number of bytes sent")
 	assert.True(t, destsSent[httpAddr], "http address wasn't recorded as sent destination")
 	assert.True(t, destsReceived[httpAddr], "http address wasn't recorded as received destination")
@@ -81,6 +141,11 @@ func doTestPlainText(buffered bool, t *testing.T) {
 
 func doTestTLS(buffered bool, t *testing.T) {
 	startServers(t)
+
+	_, counter, err := fdcount.Matching("TCP")
+	if err != nil {
+		t.Fatalf("Unable to get fdcount: %v", err)
+	}
 
 	conn, err := prepareConn(httpsAddr, buffered, false, t)
 	if err != nil {
@@ -91,7 +156,11 @@ func doTestTLS(buffered bool, t *testing.T) {
 		ServerName: "localhost",
 		RootCAs:    cert.PoolContainingCert(),
 	})
-	defer tlsConn.Close()
+	defer func() {
+		err := conn.Close()
+		assert.Nil(t, err, "Closing conn should succeed")
+		assert.NoError(t, counter.AssertDelta(2), "All file descriptors except the connection from proxy to destination site should have been closed")
+	}()
 
 	err = tlsConn.Handshake()
 	if err != nil {
@@ -114,7 +183,7 @@ func doTestBad(buffered bool, t *testing.T) {
 	}
 }
 
-func prepareConn(addr string, buffered bool, fail bool, t *testing.T) (conn *Conn, err error) {
+func prepareConn(addr string, buffered bool, fail bool, t *testing.T) (conn net.Conn, err error) {
 	return Dial(addr,
 		&Config{
 			DialProxy: func(addr string) (net.Conn, error) {
@@ -124,14 +193,13 @@ func prepareConn(addr string, buffered bool, fail bool, t *testing.T) (conn *Con
 				}
 				return net.Dial(proto, proxyAddr)
 			},
-			NewRequest: func(host string, method string, body io.Reader) (req *http.Request, err error) {
-				if host == "" {
-					host = proxyAddr
-				}
-				return http.NewRequest(method, "http://"+host, body)
-			},
+			NewRequest:     newRequest,
 			BufferRequests: buffered,
 		})
+}
+
+func newRequest(host string, method string, body io.Reader) (req *http.Request, err error) {
+	return http.NewRequest(method, "http://"+proxyAddr, body)
 }
 
 func doRequests(conn net.Conn, t *testing.T) {
@@ -149,13 +217,14 @@ func makeRequest(conn net.Conn, t *testing.T) *http.Request {
 	if err != nil {
 		t.Fatalf("Unable to create request: %s", err)
 	}
-	req.Header.Set("Proxy-Connection", "keep-alive")
+
 	go func() {
 		err = req.Write(conn)
 		if err != nil {
 			t.Fatalf("Unable to write request: %s", err)
 		}
 	}()
+
 	return req
 }
 

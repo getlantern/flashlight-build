@@ -2,11 +2,14 @@ package server
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,6 +31,8 @@ const (
 
 var (
 	log = golog.LoggerFor("flashlight.server")
+
+	registerPeriod = 5 * time.Minute
 )
 
 type Server struct {
@@ -50,7 +55,7 @@ type Server struct {
 	waddellClient  *waddell.Client
 	nattywadServer *nattywad.Server
 	cfg            *ServerConfig
-	cfgMutex       sync.Mutex
+	cfgMutex       sync.RWMutex
 }
 
 func (server *Server) Configure(newCfg *ServerConfig) {
@@ -137,7 +142,41 @@ func (server *Server) ListenAndServe() error {
 	if err != nil {
 		return fmt.Errorf("Unable to listen at %s: %s", server.Addr, err)
 	}
+
+	go server.register()
+
 	return fs.Serve(l)
+}
+
+func (server *Server) register() {
+	for {
+		server.cfgMutex.RLock()
+		baseUrl := server.cfg.RegisterAt
+		server.cfgMutex.RUnlock()
+		if baseUrl != "" {
+			if globals.InstanceId == "" {
+				log.Error("Unable to register server because no InstanceId is configured")
+			} else {
+				log.Debugf("Registering server at %v", baseUrl)
+				registerUrl := baseUrl + "/register"
+				vals := url.Values{
+					"name": []string{globals.InstanceId},
+					"port": []string{"443"},
+				}
+				resp, err := http.PostForm(registerUrl, vals)
+				if err != nil {
+					log.Errorf("Unable to register at %v: %v", registerUrl, err)
+				} else if resp.StatusCode != 200 {
+					bodyString, _ := ioutil.ReadAll(resp.Body)
+					log.Errorf("Unexpected response status registering at %v: %d    %v", registerUrl, resp.StatusCode, string(bodyString))
+				} else {
+					log.Debugf("Successfully registered server at %v", registerUrl)
+				}
+				resp.Body.Close()
+				time.Sleep(registerPeriod)
+			}
+		}
+	}
 }
 
 func (server *Server) startNattywad(waddellAddr string) {
@@ -242,7 +281,7 @@ func determineInternalIP() (string, error) {
 }
 
 func onBytesGiven(destAddr string, req *http.Request, bytes int64) {
-	_, port, _ := net.SplitHostPort(destAddr)
+	host, port, _ := net.SplitHostPort(destAddr)
 	if port == "" {
 		port = "0"
 	}
@@ -258,5 +297,15 @@ func onBytesGiven(destAddr string, req *http.Request, bytes int64) {
 		givenTo := statreporter.Country(clientCountry)
 		givenTo.Increment("bytesGivenTo").Add(bytes)
 		givenTo.Increment("bytesGivenToByFlashlight").Add(bytes)
+		givenTo.Member("distinctDestHosts", host)
+
+		clientIp := req.Header.Get("X-Forwarded-For")
+		if clientIp != "" {
+			// clientIp may contain multiple ips, use the first
+			ips := strings.Split(clientIp, ",")
+			clientIp := strings.TrimSpace(ips[0])
+			givenTo.Member("distinctClients", clientIp)
+		}
+
 	}
 }
