@@ -115,11 +115,11 @@ func (server *Server) ListenAndServe() error {
 		WriteTimeout:               server.WriteTimeout,
 		CertContext:                server.CertContext,
 		AllowNonGlobalDestinations: server.AllowNonGlobalDestinations,
+		ListenWithOpenSSL:			server.cfg.ListenWithOpenSSL,
 	}
 
-	if server.cfg.Unencrypted {
-		log.Debug("Running in unencrypted mode")
-		fs.CertContext = nil
+	if server.cfg.ListenWithOpenSSL {
+		log.Debug("Using OpenSSL to listen for incoming connections")
 	}
 
 	// Add callbacks to track bytes given
