@@ -12,3 +12,5 @@ flashlight.yaml
 *.swp
 *.swo
 envvars.bash
+*.swp
+*.swo
