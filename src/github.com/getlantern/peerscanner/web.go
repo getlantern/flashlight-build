@@ -127,7 +127,13 @@ func unregister(resp http.ResponseWriter, req *http.Request) {
 }
 
 func getHostInfo(req *http.Request) (name string, ip string, port int, supportedFronts int, err error) {
-	name = req.FormValue("name")
+	err = req.ParseForm()
+	if err != nil {
+		err = fmt.Errorf("Couldn't parse form: %v", err)
+		return
+	}
+
+	name = getSingleFormValue(req, "name")
 	if name == "" {
 		err = fmt.Errorf("Please specify a name")
 		return
@@ -137,19 +143,19 @@ func getHostInfo(req *http.Request) (name string, ip string, port int, supported
 		err = fmt.Errorf("Unable to determine IP address")
 		return
 	}
-	portString := req.FormValue("port")
+	portString := getSingleFormValue(req, "port")
 	if portString != "" {
 		port, err = strconv.Atoi(portString)
 		if err != nil {
 			err = fmt.Errorf("Received invalid port for %v - %v: %v", name, ip, portString)
 		}
 	}
-	fronts := req.FormValue("fronts")
-	if fronts == "" {
+	fronts := req.Form["fronts"]
+	if len(fronts) == 0 {
 		// backwards compatibility
-		fronts = "cloudflare"
+		fronts = []string{"cloudflare"}
 	}
-	for _, front := range strings.Split(fronts, ",") {
+	for _, front := range fronts {
 		switch front {
 		case "cloudflare":
 			supportedFronts |= cloudflareBit
@@ -176,4 +182,16 @@ func clientIpFor(req *http.Request, name string) string {
 	// clientIp may contain multiple ips, use the first
 	ips := strings.Split(clientIp, ",")
 	return strings.TrimSpace(ips[0])
+}
+
+func getSingleFormValue(req *http.Request, name string) string {
+	ls := req.Form[name]
+	if len(ls) == 0 {
+		return ""
+	}
+	if len(ls) > 1 {
+		// But we still allow it for robustness.
+		log.Errorf("More than one '%v' provided in form: %v", name, ls)
+	}
+	return ls[0]
 }
