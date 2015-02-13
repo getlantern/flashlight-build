@@ -307,8 +307,13 @@ func (h *host) doReset(newName string) {
 		if h.cdnRecord != nil {
 			log.Debugf("Deregistering old hostname %v", h.name)
 			h.doDeregisterCdnHost()
-			h.doDeregisterNoCdnHost()
 		}
+		if h.noCdnRecord != nil {
+			log.Debugf("Deregistering old no-cdn entry for %v", h.name)
+			h.doDeregisterNoCdnHost()
+			h.deregisterFromNoCdnRotations()
+		}
+		h.cfrDist = nil
 		h.name = newName
 	}
 }
@@ -459,9 +464,17 @@ func (h *host) doDeregisterNoCdnHost() {
 }
 
 func (h *host) deregisterFromRotations() {
+	h.deregisterFromCdnRotations()
+	h.deregisterFromNoCdnRotations()
+}
+
+func (h *host) deregisterFromCdnRotations() {
 	for _, group := range h.cdnGroups {
 		group.deregister(h)
 	}
+}
+
+func (h *host) deregisterFromNoCdnRotations() {
 	for _, group := range h.noCdnGroups {
 		group.deregister(h)
 	}
