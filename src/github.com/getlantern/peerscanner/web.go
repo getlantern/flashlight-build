@@ -57,7 +57,7 @@ func startHttp() {
 // If peers are successfully vetted, they'll be added to the DNS round robin.
 func register(resp http.ResponseWriter, req *http.Request) {
 	name, ip, port, supportedFronts, err := getHostInfo(req)
-	if err == nil && !(port == 80 || port == 443) {
+	if err == nil && !(port == "80" || port == "443") {
 		err = fmt.Errorf("Port %d not supported, only ports 80 and 443 are supported", port)
 	}
 	if err != nil {
@@ -66,7 +66,7 @@ func register(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	h := getOrCreateHost(name, ip)
+	h := getOrCreateHost(name, ip, port)
 	online, connectionRefused, timedOut := h.status()
 	if timedOut {
 		log.Debugf("%v timed out waiting for status, returning 500 error", h)
@@ -126,7 +126,7 @@ func unregister(resp http.ResponseWriter, req *http.Request) {
 	fmt.Fprintln(resp, msg)
 }
 
-func getHostInfo(req *http.Request) (name string, ip string, port int, supportedFronts int, err error) {
+func getHostInfo(req *http.Request) (name string, ip string, port string, supportedFronts int, err error) {
 	err = req.ParseForm()
 	if err != nil {
 		err = fmt.Errorf("Couldn't parse form: %v", err)
@@ -143,11 +143,11 @@ func getHostInfo(req *http.Request) (name string, ip string, port int, supported
 		err = fmt.Errorf("Unable to determine IP address")
 		return
 	}
-	portString := getSingleFormValue(req, "port")
-	if portString != "" {
-		port, err = strconv.Atoi(portString)
+	port = getSingleFormValue(req, "port")
+	if port != "" {
+		_, err = strconv.Atoi(port)
 		if err != nil {
-			err = fmt.Errorf("Received invalid port for %v - %v: %v", name, ip, portString)
+			err = fmt.Errorf("Received invalid port for %v - %v: %v", name, ip, port)
 		}
 	}
 	fronts := req.Form["fronts"]

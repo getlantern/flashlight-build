@@ -55,6 +55,7 @@ type status struct {
 type host struct {
 	name        string
 	ip          string
+	port        string
 	cdnRecord   *cloudflare.Record
 	noCdnRecord *cloudflare.Record
 	cfrDist     *cfr.Distribution
@@ -82,44 +83,17 @@ func (h *host) String() string {
  ******************************************************************************/
 
 // newHost creates a new host for the given name, ip and optional DNS record.
-func newHost(name string, ip string, record *cloudflare.Record) *host {
-	// Cache TLS sessions
-	clientSessionCache := tls.NewLRUClientSessionCache(1000)
+func newHost(name string, ip string, record *cloudflare.Record, port string) *host {
 
 	h := &host{
 		name:         name,
 		ip:           ip,
+		port:         port,
 		cdnRecord:    record,
 		resetCh:      make(chan string, 1000),
 		unregisterCh: make(chan interface{}, 1),
 		statusCh:     make(chan chan *status, 1000),
 		initCfrCh:    make(chan interface{}, 1),
-	}
-	h.proxiedClient = &http.Client{
-		Transport: &http.Transport{
-			Dial: func(network, addr string) (net.Conn, error) {
-				return enproxy.Dial(addr, &enproxy.Config{
-					DialProxy: func(addr string) (net.Conn, error) {
-						return tlsdialer.DialWithDialer(&net.Dialer{
-							Timeout: dialTimeout,
-						}, "tcp", ip+":443", true, &tls.Config{
-							InsecureSkipVerify: true,
-							ClientSessionCache: clientSessionCache,
-						})
-					},
-					NewRequest: func(upstreamHost string, method string, body io.Reader) (req *http.Request, err error) {
-						return http.NewRequest(method, "http://"+ip+"/", body)
-					},
-					OnFirstResponse: func(resp *http.Response) {
-						h.reportedHostMutex.Lock()
-						h.reportedHost = resp.Header.Get(enproxy.X_ENPROXY_PROXY_HOST)
-						h.reportedHostMutex.Unlock()
-					},
-				})
-			},
-			DisableKeepAlives: true,
-		},
-		Timeout: requestTimeout,
 	}
 
 	if h.isFallback() {
@@ -141,6 +115,48 @@ func newHost(name string, ip string, record *cloudflare.Record) *host {
 	}
 
 	return h
+}
+
+func (h *host) resetProxiedClient(port string) {
+	// Cache TLS sessions
+	clientSessionCache := tls.NewLRUClientSessionCache(1000)
+	var dial func(addr string) (net.Conn, error)
+	if port == "80" {
+		dialer := net.Dialer{Timeout: dialTimeout}
+		dial = func(addr string) (net.Conn, error) {
+			return dialer.Dial("tcp", h.ip+":"+port)
+		}
+	} else if port == "443" {
+		dial = func(addr string) (net.Conn, error) {
+			return tlsdialer.DialWithDialer(&net.Dialer{
+				Timeout: dialTimeout,
+			}, "tcp", h.ip+":"+port, true, &tls.Config{
+				InsecureSkipVerify: true,
+				ClientSessionCache: clientSessionCache,
+			})
+		}
+	} else {
+		log.Fatalf("Unsupported port: %v", port)
+	}
+	h.proxiedClient = &http.Client{
+		Transport: &http.Transport{
+			Dial: func(network, addr string) (net.Conn, error) {
+				return enproxy.Dial(addr, &enproxy.Config{
+					DialProxy: dial,
+					NewRequest: func(upstreamHost string, method string, body io.Reader) (req *http.Request, err error) {
+						return http.NewRequest(method, "http://"+h.ip+"/", body)
+					},
+					OnFirstResponse: func(resp *http.Response) {
+						h.reportedHostMutex.Lock()
+						h.reportedHost = resp.Header.Get(enproxy.X_ENPROXY_PROXY_HOST)
+						h.reportedHostMutex.Unlock()
+					},
+				})
+			},
+			DisableKeepAlives: true,
+		},
+		Timeout: requestTimeout,
+	}
 }
 
 // status returns the status of this host as of the next scheduled check
@@ -520,11 +536,29 @@ func (h *host) isAbleToProxy() (bool, bool, error) {
 }
 
 func (h *host) doIsAbleToProxy() (bool, bool, error) {
+	if h.port == "" {
+		h.resetProxiedClient("80")
+		success, connectionRefused, err := h.doDoIsAbleToProxy("80")
+		if success {
+			h.port = "80"
+			return success, connectionRefused, err
+		}
+		h.resetProxiedClient("443")
+		success, connectionRefused, err = h.doDoIsAbleToProxy("443")
+		if success {
+			h.port = "443"
+		}
+		return success, connectionRefused, err
+	}
+	return h.doDoIsAbleToProxy(h.port)
+}
+
+func (h *host) doDoIsAbleToProxy(port string) (bool, bool, error) {
 	// First just try a plain TCP connection. This is useful because the
 	// underlying TCP-level error is consumed in the flashlight layer, and we
 	// need that to be accessible on the client side in the logic for deciding
 	// whether or not to display the port mapping message.
-	addr := h.ip + ":443"
+	addr := h.ip + ":" + port
 	conn, err := net.DialTimeout("tcp", addr, dialTimeout)
 	if err != nil {
 		err2 := fmt.Errorf("Unable to connect to %v: %v", addr, err)

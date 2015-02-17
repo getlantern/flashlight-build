@@ -255,13 +255,13 @@ func removeRecord(wg *sync.WaitGroup, k string, r *cloudflare.Record) {
 	wg.Done()
 }
 
-func getOrCreateHost(name string, ip string) *host {
+func getOrCreateHost(name string, ip string, port string) *host {
 	hostsMutex.Lock()
 	defer hostsMutex.Unlock()
 
 	h := hostsByIp[ip]
 	if h == nil {
-		h := newHost(name, ip, nil)
+		h := newHost(name, ip, nil, port)
 		hostsByIp[ip] = h
 		go h.run()
 		return h
