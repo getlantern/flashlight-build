@@ -142,12 +142,14 @@ func loadHosts() (map[string]*host, error) {
 		groupMap[name][r.Value] = &r
 	}
 
-	// Build map of existing hosts
-	hosts := make(map[string]*host)
+	// Build maps of existing hosts
+	hostsByName := make(map[string]*host)
+	hostsByIp := make(map[string]*host)
 
 	addHost := func(r cloudflare.Record) {
-		h := newHost(r.Name, r.Value, &r)
-		hosts[h.ip] = h
+		h := newHost(r.Name, r.Value, &r, "")
+		hostsByName[h.name] = h
+		hostsByIp[h.ip] = h
 	}
 
 	// Look through all records to find peers, fallbacks and groups
@@ -177,8 +179,9 @@ func loadHosts() (map[string]*host, error) {
 
 	// Assign all cloudfront distributions
 	for _, d := range dists {
-		h, found := hosts[d.InstanceId+"."+*cfldomain]
+		h, found := hostsByName[d.InstanceId]
 		if found {
+			log.Debugf("Found existing distribution for %v", d.InstanceId)
 			h.cfrDist = d
 		}
 	}
@@ -188,7 +191,7 @@ func loadHosts() (map[string]*host, error) {
 	var wg sync.WaitGroup
 	for _, r := range recs {
 		if isNoCdnFallback(r.Name) || isNoCdnPeer(r.Name) {
-			h, found := hosts[r.Value]
+			h, found := hostsByIp[r.Value]
 			if found && h.cfrDist != nil && h.cfrDist.Status == "Deployed" {
 				h.noCdnRecord = &r
 			} else {
@@ -199,7 +202,7 @@ func loadHosts() (map[string]*host, error) {
 	}
 
 	// Update hosts with CDN group info
-	for _, h := range hosts {
+	for _, h := range hostsByIp {
 		for _, hg := range h.cdnGroups {
 			g, found := cdnGroups[hg.subdomain]
 			if found {
@@ -210,7 +213,7 @@ func loadHosts() (map[string]*host, error) {
 	}
 
 	// Update hosts with no-CDN group info
-	for _, h := range hosts {
+	for _, h := range hostsByIp {
 		if h.noCdnRecord != nil {
 			for _, hg := range h.noCdnGroups {
 				g, found := noCdnGroups[hg.subdomain]
@@ -239,11 +242,11 @@ func loadHosts() (map[string]*host, error) {
 	wg.Wait()
 
 	// Start hosts
-	for _, h := range hosts {
+	for _, h := range hostsByIp {
 		go h.run()
 	}
 
-	return hosts, nil
+	return hostsByIp, nil
 }
 
 func removeRecord(wg *sync.WaitGroup, k string, r *cloudflare.Record) {
