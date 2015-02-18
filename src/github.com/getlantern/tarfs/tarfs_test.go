@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"io"
 	"io/ioutil"
+	"strings"
 	"testing"
 
 	"github.com/getlantern/testify/assert"
@@ -26,13 +27,13 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatalf("Unable to load expectedC: %v", err)
 	}
 
-	tarString := bytes.NewBuffer(nil)
-	err = EncodeToTarString("resources", tarString)
+	tarLiteral := bytes.NewBuffer(nil)
+	err = EncodeToTarLiteral("resources", tarLiteral)
 	if err != nil {
 		t.Fatalf("Unable to encode to tar string: %v", err)
 	}
 
-	fs, err := New(tarStringToBytes(t, tarString), "localresources")
+	fs, err := New(tarLiteralToBytes(t, tarLiteral), "localresources")
 	if err != nil {
 		t.Fatalf("Unable to open filesystem: %v", err)
 	}
@@ -75,16 +76,26 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
-// tarStringToBytes converts a string like \x69\x6e\x64\x65\x78\x2e\x68\x74 into
-// a byte array.
-func tarStringToBytes(t *testing.T, bbuf *bytes.Buffer) []byte {
-	tarString := string(bbuf.Bytes())
-	buf := make([]byte, 0, len(tarString)/4)
-	for i := 0; i < len(tarString); i += 4 {
-		s := tarString[i+2 : i+4]
-		b, err := hex.DecodeString(s)
+// tarLiteralToBytes converts a string like []byte {0x4d, 0x5a, 0x90} into a
+// byte array.
+func tarLiteralToBytes(t *testing.T, bbuf *bytes.Buffer) []byte {
+	tarLiteral := string(bbuf.Bytes())
+	tarLiteral = strings.Replace(tarLiteral, "[]byte", "", -1)
+	tarLiteral = strings.Replace(tarLiteral, "{", "", -1)
+	tarLiteral = strings.Replace(tarLiteral, "}", "", -1)
+	tarLiteral = strings.Replace(tarLiteral, "\n", "", -1)
+	tarLiteral = strings.Replace(tarLiteral, " ", "", -1)
+
+	parts := strings.Split(tarLiteral, ",")
+	buf := make([]byte, 0, len(parts)-1)
+	for i, s := range parts {
+		if i == len(parts)-1 {
+			// skip last empty byte
+			break
+		}
+		b, err := hex.DecodeString(s[2:])
 		if err != nil {
-			t.Fatalf("Unable to decode %v: %v", err)
+			t.Fatalf("Unable to decode %v: %v", s, err)
 		}
 		buf = append(buf, b...)
 	}
