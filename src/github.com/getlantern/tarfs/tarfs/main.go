@@ -38,19 +38,14 @@ func main() {
 		die("Please specify a folder to embed")
 	}
 
-	_, err := fmt.Fprintf(os.Stdout, "package %v\n\nvar %v = []byte(\"", *pkg, *varname)
+	_, err := fmt.Fprintf(os.Stdout, "package %v\n\nvar %v = ", *pkg, *varname)
 	if err != nil {
 		die("Unable to write file header: %v", err)
 	}
 
 	dir := flag.Arg(0)
-	err = tarfs.EncodeToTarString(dir, os.Stdout)
+	err = tarfs.EncodeToTarLiteral(dir, os.Stdout)
 	if err != nil {
 		die("Unable to encode %v to tar string: %v", dir, err)
-	}
-
-	_, err = fmt.Fprintf(os.Stdout, `")`)
-	if err != nil {
-		die("Unable to write file footer: %v", err)
 	}
 }

@@ -10,18 +10,27 @@ import (
 	"strings"
 )
 
-// EncodeToTarString takes the contents of the given directory and writes it to
-// the given Writer in the form of an unquoted UTF-8 encoded string that
-// contains a tar archive of the directory, for example
-// \x69\x6e\x64\x65\x78\x2e\x68\x74 ...
-func EncodeToTarString(dir string, w io.Writer) error {
-	tw := tar.NewWriter(&stringencodingwriter{w})
+const (
+	bytesPerColumn = 12
+)
+
+// EncodeToTarLiteral takes the contents of the given directory and writes it to
+// the given Writer in the form of a byte array literal, for example
+// []byte {0x4d, 0x5a, 0x90}.
+func EncodeToTarLiteral(dir string, w io.Writer) error {
+	aew := &arrayencodingwriter{w, 0}
+	err := aew.start()
+	if err != nil {
+		return fmt.Errorf("Unable to start byte array literal: %v", err)
+	}
+
+	tw := tar.NewWriter(aew)
 	defer tw.Close()
 
 	dirPrefix := dir + "/"
 	dirPrefixLen := len(dirPrefix)
 
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return fmt.Errorf("Unable to walk to %v: %v", path, err)
 		}
@@ -61,19 +70,41 @@ func EncodeToTarString(dir string, w io.Writer) error {
 		return fmt.Errorf("Unable to close tar writer: %v", err)
 	}
 
-	return nil
+	return aew.finish()
 }
 
-// stringencodingwriter is a writer that encodes written bytes into a UTF-8
-// encoded string.
-type stringencodingwriter struct {
+// arrayencodingwriter is a writer that encodes written bytes into a byte array
+// literal.
+type arrayencodingwriter struct {
 	io.Writer
+	column int
 }
 
-func (w *stringencodingwriter) Write(buf []byte) (int, error) {
+func (w *arrayencodingwriter) start() error {
+	_, err := fmt.Fprintf(w.Writer, "[]byte {\n")
+	return err
+}
+
+func (w *arrayencodingwriter) finish() error {
+	_, err := fmt.Fprintf(w.Writer, "\n}")
+	return err
+}
+
+func (w *arrayencodingwriter) Write(buf []byte) (int, error) {
 	n := 0
 	for _, b := range buf {
-		_, err := fmt.Fprintf(w.Writer, `\x%v`, hex.EncodeToString([]byte{b}))
+		if w.column == bytesPerColumn {
+			// Wrap to next line
+			_, err := fmt.Fprintf(w.Writer, "\n")
+			if err != nil {
+				return 0, err
+			}
+			w.column = 1
+		} else {
+			w.column += 1
+		}
+
+		_, err := fmt.Fprintf(w.Writer, `0x%v, `, hex.EncodeToString([]byte{b}))
 		if err != nil {
 			return n, err
 		}
