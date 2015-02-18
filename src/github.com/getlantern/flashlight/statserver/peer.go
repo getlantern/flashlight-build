@@ -6,11 +6,15 @@ import (
 	"net/http"
 	"sync/atomic"
 	"time"
+
+	"github.com/getlantern/flashlight/util"
 )
 
 const (
 	GEOSERVE_URL_TEMPLATE = "http://go-geoserve.herokuapp.com/lookup/%s"
 )
+
+const ipLookupTimeout = 20 * time.Second
 
 var (
 	publishInterval = 10 * time.Second
@@ -141,10 +145,35 @@ func (peer *Peer) run() error {
 }
 
 func (peer *Peer) geolocate() error {
-	resp, err := http.Get(fmt.Sprintf(GEOSERVE_URL_TEMPLATE, peer.IP))
-	if err != nil {
-		return err
+	var err error
+	var client *http.Client
+	var req *http.Request
+
+	// Don't allow direct requests.
+	if cfg.ProxyAddr == "" {
+		return fmt.Errorf("Proxy is not ready yet.")
 	}
+
+	// Create a client that will tunnel requests through a proxy.
+	if client, err = util.HTTPClient(cfg.CloudConfigCA, cfg.ProxyAddr); err != nil {
+		return fmt.Errorf("Could not create client proxy: %q", err)
+	}
+
+	client.Timeout = ipLookupTimeout
+
+	lookupURL := fmt.Sprintf(GEOSERVE_URL_TEMPLATE, peer.IP)
+	if req, err = http.NewRequest("GET", lookupURL, nil); err != nil {
+		return fmt.Errorf("Could not create request: %q", err)
+	}
+
+	// Tunnel request over proxy.
+	var resp *http.Response
+	if resp, err = client.Do(req); err != nil {
+		return fmt.Errorf("Could not get response from server: %q", err)
+	}
+
+	defer resp.Body.Close()
+
 	decoder := json.NewDecoder(resp.Body)
 	geodata := &City{}
 	err = decoder.Decode(geodata)
