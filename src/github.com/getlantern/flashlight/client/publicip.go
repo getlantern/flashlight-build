@@ -7,7 +7,7 @@ import (
 	"github.com/getlantern/fronted"
 )
 
-func determinePublicIp(fd fronted.Dialer) {
+func lookupPublicIp(fd fronted.Dialer) {
 	client := fd.DirectHttpClient()
 	resp, err := client.Get("http://geo.getiantem.org/lookup")
 	if err != nil {

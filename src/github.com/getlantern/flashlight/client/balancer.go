@@ -1,6 +1,8 @@
 package client
 
 import (
+	"math"
+
 	"github.com/getlantern/balancer"
 	"github.com/getlantern/fronted"
 )
@@ -16,7 +18,7 @@ func (client *Client) initBalancer(cfg *ClientConfig) *balancer.Balancer {
 
 	log.Debugf("Adding %d domain fronted servers", len(cfg.FrontedServers))
 	var highestQOSFrontedDialer fronted.Dialer
-	highestQOS := -1
+	highestQOS := math.MinInt32
 	for _, s := range cfg.FrontedServers {
 		fd, dialer := s.dialer(cfg.MasqueradeSets)
 		dialers = append(dialers, dialer)
@@ -26,7 +28,9 @@ func (client *Client) initBalancer(cfg *ClientConfig) *balancer.Balancer {
 	}
 
 	if highestQOSFrontedDialer != nil {
-		go determinePublicIp(highestQOSFrontedDialer)
+		go lookupPublicIp(highestQOSFrontedDialer)
+	} else {
+		log.Debugf("No fronted dialers found, unable to look up public ip")
 	}
 
 	log.Debugf("Adding %d chained servers", len(cfg.ChainedServers))
