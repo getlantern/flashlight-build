@@ -25,17 +25,12 @@ var (
 
 func init() {
 	// Write DLL to file
-	b, err := Asset("systray.dll")
-	if err != nil {
-		panic(fmt.Errorf("Unable to read systray.dll: %v", err))
-	}
-
-	err = os.MkdirAll(dllDir, 0755)
+	err := os.MkdirAll(dllDir, 0755)
 	if err != nil {
 		panic(fmt.Errorf("Unable to create directory %v to hold systray.dll: %v", dllDir, err))
 	}
 
-	err = ioutil.WriteFile(dllFile, b, 0644)
+	err = ioutil.WriteFile(dllFile, systraydll, 0644)
 	if err != nil {
 		panic(fmt.Errorf("Unable to save systray.dll to %v: %v", dllFile, err))
 	}
