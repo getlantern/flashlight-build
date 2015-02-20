@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/getlantern/flashlight/geo"
+	"github.com/getlantern/geolookup"
 )
 
 var (
@@ -60,11 +60,11 @@ func (peer *Peer) run() error {
 
 func (peer *Peer) geolocate() error {
 
-	if geo.UsesDefaultHTTPClient() {
+	if geolookup.UsesDefaultHTTPClient() {
 		return fmt.Errorf("Geolocation service could not be consulted over a proxy yet.")
 	}
 
-	geodata, err := geo.LookupCity(peer.IP)
+	geodata, err := geolookup.LookupCity(peer.IP)
 	if err != nil {
 		return err
 	}

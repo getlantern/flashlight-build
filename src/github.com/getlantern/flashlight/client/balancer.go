@@ -4,8 +4,8 @@ import (
 	"math"
 
 	"github.com/getlantern/balancer"
-	"github.com/getlantern/flashlight/geo"
 	"github.com/getlantern/fronted"
+	"github.com/getlantern/geolookup"
 )
 
 func (client *Client) getBalancer() *balancer.Balancer {
@@ -31,7 +31,7 @@ func (client *Client) initBalancer(cfg *ClientConfig) *balancer.Balancer {
 	if highestQOSFrontedDialer != nil {
 		// This function will configure the HTTP client the geo package is going to
 		// use.
-		geo.SetHTTPClient(highestQOSFrontedDialer.DirectHttpClient())
+		geolookup.SetHTTPClient(highestQOSFrontedDialer.DirectHttpClient())
 	} else {
 		log.Debugf("No fronted dialers found, unable to look up public ip")
 	}
