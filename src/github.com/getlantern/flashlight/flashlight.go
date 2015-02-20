@@ -21,6 +21,7 @@ import (
 
 	"github.com/getlantern/flashlight/client"
 	"github.com/getlantern/flashlight/config"
+	"github.com/getlantern/flashlight/geolookup"
 	"github.com/getlantern/flashlight/proxiedsites"
 	"github.com/getlantern/flashlight/server"
 	"github.com/getlantern/flashlight/statreporter"
@@ -151,8 +152,11 @@ func runClientProxy(cfg *config.Config) {
 		ui.Show()
 	}
 
-	// intitial proxied sites configuration
+	// initial proxied sites configuration
 	proxiedsites.Configure(cfg.ProxiedSites)
+
+	// launching geolookup service when in client mode.
+	go geolookup.StartService()
 
 	// Continually poll for config updates and update client accordingly
 	go func() {
