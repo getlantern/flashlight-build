@@ -1,4 +1,4 @@
-package geo
+package geolookup
 
 import (
 	"encoding/json"
