@@ -67,13 +67,15 @@
               placeholder="{{ 'SEARCH' | translate }}">
         </div>
         <form name="proxiedSitesForm" ng-init="setFormScope(this)">
-          <textarea ng-model="proxiedSites" name="input" placeholder="example.com" required
+          <textarea name="input" placeholder="example.com" required
             split-array 
+            dynamic
+            ng-model="entries"
             ng-model-options="{ getterSetter: true }"
             ng-hide="!!searchText" ng-readonly="!!searchText" focus-on="show"
             ui-validate="'validate($value)'" id="proxiedSitesInput"
             dir="ltr" tabindex="{{ show && 1 || '' }}"></textarea>
-          <textarea ng-model="proxiedSites" split-array placeholder="{{ 'NO_MATCHING_SITES' | translate }} &quot;{{searchText}}&quot;"
+          <textarea dynamic ng-model="entries" split-array placeholder="{{ 'NO_MATCHING_SITES' | translate }} &quot;{{searchText}}&quot;"
             ng-show="!!searchText" readonly dir="ltr"></textarea>
         </form>
       </div>
@@ -92,7 +94,7 @@
   <div class="modal-footer">
       <button type="button" class="btn" ng-click="resetProxiedSites(false)" tabindex="{{ show && 3 || '' }">{{ 'CANCEL' | translate }}</button>
 
-    <button type="button" class="btn" ng-click="resetProxiedSites(true)" tabindex="{{ show && 3 || '' }">{{ 'RESET' | translate }}</button>
+      <!--<button type="button" class="btn" ng-click="resetProxiedSites(true)" tabindex="{{ show && 3 || '' }">{{ 'RESET' | translate }}</button>-->
     <button id="continueFromProxiedSites" 
             type="button" class="btn btn-primary" tabindex="{{ show && 2 || '' }}"
             ng-disabled="updating || proxiedSitesForm.$invalid"

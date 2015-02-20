@@ -1,7 +1,7 @@
 'use strict';
 
 app.controller('RootCtrl', ['$scope', '$http', 'flashlightStats', function($scope, $http, flashlightStats) {
-    //flashlightStats.connect();
+    // disabling for now flashlightStats.connect();
     $scope.currentModal = 'none';
 
     $scope.showModal = function(val) {
@@ -61,32 +61,34 @@ app.controller('SettingsCtrl', ['$scope', 'MODAL', function($scope, MODAL) {
   });
 }]);
 
-app.controller('ProxiedSitesCtrl', ['$scope', '$filter', 'SETTING', 'INTERACTION', 'INPUT_PAT', 'MODAL', 'ProxiedSites', function($scope, $filter, SETTING, INTERACTION, INPUT_PAT, MODAL, ProxiedSites) {
+app.controller('ProxiedSitesCtrl', ['$rootScope', '$scope', '$filter', 'SETTING', 'INTERACTION', 'INPUT_PAT', 'MODAL', 'ProxiedSites', function($rootScope, $scope, $filter, SETTING, INTERACTION, INPUT_PAT, MODAL, ProxiedSites) {
       var fltr = $filter('filter'),
       DOMAIN = INPUT_PAT.DOMAIN,
       IPV4 = INPUT_PAT.IPV4,
-      nproxiedSitesMax = 1000,
-      proxiedSites = [],
+      nproxiedSitesMax = 10000,
       proxiedSitesDirty = [];
 
-  $scope.proxiedSites = [];
+  $scope.proxiedSites = ProxiedSites.entries;
 
-  ProxiedSites.get({ list: 'original'}).$promise.then(function(data) {
-      $scope.originalList = data.ProxiedSites;
-      $scope.globalList = data.Global;
-      $scope.proxiedSites = data.ProxiedSites;
-  });
+  $scope.arrLowerCase = function(A) {
+      if (A) {
+        return A.join('|').toLowerCase().split('|');
+      } else {
+        return [];
+      }
+  }
 
   $scope.setFormScope = function(scope) {
       $scope.formScope = scope;
   };
 
   $scope.resetProxiedSites = function(reset) {
-    $scope.proxiedSites = $scope.globalList;
-    $scope.input = $scope.proxiedSites;
     if (reset) {
+        $rootScope.entries = $rootScope.global;
+        $scope.input = $scope.proxiedSites;
         makeValid();
     } else {
+        $rootScope.entries = $rootScope.originalList;
         $scope.closeModal();
     }
   };
@@ -95,9 +97,9 @@ app.controller('ProxiedSitesCtrl', ['$scope', '$filter', 'SETTING', 'INTERACTION
 
   $scope.$watch('searchText', function (searchText) {
     if (!searchText ) {
-        $scope.proxiedSites = $scope.originalList;
+        $rootScope.entries = $rootScope.originalList;
     } else {
-        $scope.proxiedSites = (searchText ? fltr(proxiedSitesDirty, searchText) : proxiedSitesDirty);
+        $rootScope.entries = (searchText ? fltr(proxiedSitesDirty, searchText) : proxiedSitesDirty);
     }
   });
 
@@ -109,20 +111,14 @@ app.controller('ProxiedSitesCtrl', ['$scope', '$filter', 'SETTING', 'INTERACTION
     }
   }
 
-  $scope.$watch('proxiedSites', function(proxiedSites_) {
+  /*$scope.$watch('proxiedSites', function(proxiedSites_) {
     if (proxiedSites) {
       proxiedSites = normalizedLines(proxiedSites_);
       $scope.input = proxiedSites.join('\n');
       makeValid();
       proxiedSitesDirty = _.cloneDeep(proxiedSites);
     }
-  }, true);
-
-  $scope.$watch('model.nproxiedSitesMax', function(nproxiedSitesMax_) {
-    nproxiedSitesMax = nproxiedSitesMax_;
-    if ($scope.input)
-      $scope.validate($scope.input);
-  }, true);
+  }, true);*/
 
   function normalizedLine (domainOrIP) {
     return angular.lowercase(domainOrIP.trim());
@@ -165,12 +161,26 @@ app.controller('ProxiedSitesCtrl', ['$scope', '$filter', 'SETTING', 'INTERACTION
     return !$scope.errorLabelKey;
   };
 
+  $scope.setDiff  = function(A, B) {
+      return A.filter(function (a) {
+          return B.indexOf(a) == -1;
+      });
+  };
+
   $scope.handleContinue = function () {
+    $rootScope.updates = {};
+     
     if ($scope.proxiedSitesForm.$invalid) {
       return $scope.interaction(INTERACTION.continue);
     }
-    $scope.proxiedSites = proxiedSitesDirty;
-    ProxiedSites.save({}, $scope.proxiedSites);
+
+    $scope.entries = $scope.arrLowerCase(proxiedSitesDirty);
+    $rootScope.updates.Additions = $scope.setDiff($scope.entries, 
+                                       $scope.originalList);
+    $rootScope.updates.Deletions = $scope.setDiff($scope.originalList, $scope.entries);
+
+    ProxiedSites.update();
+
     $scope.closeModal();
   };
 }]);
