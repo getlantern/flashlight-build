@@ -1,0 +1,3 @@
+can't load package: package 2: cannot find package "2" in any of:
+	/usr/local/go/src/2 (from $GOROOT)
+	/Users/reventlov/go/src/github.com/getlantern/flashlight-build/src/2 (from $GOPATH)
