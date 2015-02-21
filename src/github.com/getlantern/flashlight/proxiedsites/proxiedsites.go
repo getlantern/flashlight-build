@@ -26,7 +26,11 @@ func Configure(cfg *proxiedsites.Config) {
 	if uichannel == nil {
 		start()
 	} else if delta != nil {
-		b, err := json.Marshal(delta)
+		message := ui.Envelope{
+			Type:    ui.MessageTypeProxiedSites,
+			Message: delta,
+		}
+		b, err := json.Marshal(message)
 		if err != nil {
 			log.Errorf("Unable to publish delta to UI: %v", err)
 		} else {
@@ -43,7 +47,11 @@ func start() {
 
 	// Establish a channel to the UI for sending and receiving updates
 	uichannel = ui.NewChannel("/data", func(write func([]byte) error) error {
-		b, err := json.Marshal(proxiedsites.ActiveDelta())
+		message := ui.Envelope{
+			Type:    ui.MessageTypeProxiedSites,
+			Message: proxiedsites.ActiveDelta(),
+		}
+		b, err := json.Marshal(message)
 		if err != nil {
 			return fmt.Errorf("Unable to marshal active delta to json: %v", err)
 		}
