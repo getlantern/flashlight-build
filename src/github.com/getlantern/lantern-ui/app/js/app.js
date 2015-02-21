@@ -253,5 +253,4 @@ var app = angular.module('app', [
         }, MILLIS_UNTIL_BACKEND_CONSIDERED_GONE + 1);
       }
     });
-
   });
