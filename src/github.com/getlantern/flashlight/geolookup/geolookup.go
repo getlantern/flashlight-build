@@ -12,69 +12,83 @@ import (
 )
 
 const (
-	sleepTime = time.Second * 10
+	messageType = `GeoLookup`
 
-	endpoint = "/geolookup"
+	sleepTime = time.Second * 10
 )
 
 var (
 	log = golog.LoggerFor("geolookup-flashlight")
 
-	startMutex sync.Mutex
-	uichannel  *ui.UIChannel
-	clientCity = make(chan *geolookup.City)
+	service     *ui.Service
+	lookupMutex sync.Mutex
+	lookupData  *geolookup.City
 )
 
-func watchForUserIP() {
+func getUserGeolocationData() *geolookup.City {
+	lookupMutex.Lock()
+	defer lookupMutex.Unlock()
+
+	var err error
+
+	if lookupData != nil {
+		// We already looked up IP's information.
+		return lookupData
+	}
+
 	for {
 		if !geolookup.UsesDefaultHTTPClient() {
 			// Will look up only if we're using a proxy.
-			geodata, err := geolookup.LookupCity("")
+			lookupData, err = geolookup.LookupCity("")
 			if err == nil {
-				clientCity <- geodata
 				// We got what we wanted, no need to query for it again, let's exit.
-				return
+				return lookupData
 			}
 		}
 		// Sleep if the proxy is not ready yet of any error happened.
 		time.Sleep(sleepTime)
 	}
+
+	// We should not be able to reach this point.
+	panic("unreachable position")
 }
 
+// StartService initializes the geolocation websocket service.
 func StartService() error {
-	// Looking up client's information.
-	go watchForUserIP()
+	return start()
+}
 
-	startMutex.Lock()
+func start() (err error) {
 
-	if uichannel == nil {
-		start()
-	} else {
+	helloFn := func(write func([]byte) error) error {
 		var b []byte
 		var err error
 
-		// Waiting for the city to be discovered.
-		city := <-clientCity
+		city := getUserGeolocationData()
 
-		if b, err = json.Marshal(city); err != nil {
+		message := ui.Envelope{
+			Type:    messageType,
+			Message: city,
+		}
+
+		if b, err = json.Marshal(message); err != nil {
 			return fmt.Errorf("Unable to marshal geolocation information: %q", err)
 		}
 
-		// Writing data to channel.
-		uichannel.Out <- b
+		return write(b)
 	}
 
-	startMutex.Unlock()
+	if service, err = ui.Register(messageType, helloFn); err != nil {
+		return fmt.Errorf("Unable to register channel: %q", err)
+	}
+
+	go read()
 
 	return nil
 }
 
-func start() {
-	uichannel = ui.NewChannel(endpoint, func(func([]byte) error) error {
-		// We don't really need to to anything here yet but we could add code for
-		// allowing looking up other IPs.
-		return nil
-	})
-
-	log.Debugf("Serving geodata information at %v", uichannel.URL)
+func read() {
+	for _ = range service.In {
+		// Discard message, just in case any message is sent to this service.
+	}
 }

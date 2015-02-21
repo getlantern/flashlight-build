@@ -13,6 +13,10 @@ import (
 	"github.com/getlantern/flashlight/ui"
 )
 
+const (
+	messageType = `ProxiedSites`
+)
+
 // deltaMessage is the struct of the message we're expecting from the client.
 type deltaMessage struct {
 	Delta proxiedsites.Delta `json:"Message"`
@@ -38,7 +42,7 @@ func Configure(cfg *proxiedsites.Config) {
 	} else if delta != nil {
 		// Sending delta.
 		message := ui.Envelope{
-			Type:    ui.MessageTypeProxiedSites,
+			Type:    messageType,
 			Message: delta,
 		}
 		b, err := json.Marshal(message)
@@ -60,7 +64,7 @@ func start() (err error) {
 
 		// Hello message.
 		message := ui.Envelope{
-			Type:    ui.MessageTypeProxiedSites,
+			Type:    messageType,
 			Message: proxiedsites.ActiveDelta(),
 		}
 
@@ -73,7 +77,7 @@ func start() (err error) {
 		return write(b)
 	}
 
-	if service, err = ui.Register(ui.MessageTypeProxiedSites, helloFn); err != nil {
+	if service, err = ui.Register(messageType, helloFn); err != nil {
 		return fmt.Errorf("Unable to register channel: %q", err)
 	}
 

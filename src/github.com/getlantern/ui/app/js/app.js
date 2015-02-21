@@ -88,7 +88,7 @@ var app = angular.module('app', [
         if (typeof Messages[envelope.Type] != 'undefined') {
           Messages[envelope.Type].call(this, envelope.Message);
         } else {
-          console.log('Got unknown message type: ' + message.Type);
+          console.log('Got unknown message type: ' + envelope.Type);
         };
       });
 
@@ -119,9 +119,9 @@ var app = angular.module('app', [
       });
 
       var methods = {
-        'send': function(data) {
+        'send': function(messageType, data) {
           console.log('request to send.');
-          ds.send(JSON.stringify(data))
+          ds.send(JSON.stringify({'Type': messageType, 'Message': data}))
         }
       };
 
@@ -134,12 +134,12 @@ var app = angular.module('app', [
         update: function() {
           console.log('UPDATE');
           // dataStream.send(JSON.stringify($rootScope.updates));
-          DataStream.send($rootScope.updates)
+          DataStream.send('ProxiedSites', $rootScope.updates)
         },
         get: function() {
           console.log('GET');
           // dataStream.send(JSON.stringify({ action: 'get' }));
-          DataStream.send({'action': 'get'});
+          DataStream.send('ProxiedSites', {'action': 'get'});
         }
       };
 
