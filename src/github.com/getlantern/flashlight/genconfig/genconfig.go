@@ -25,11 +25,12 @@ const (
 )
 
 var (
-	help            = flag.Bool("help", false, "Get usage help")
-	domainsFile     = flag.String("domains", "", "Path to file containing list of domains to use, with one domain per line (e.g. domains.txt)")
-	blacklistFile   = flag.String("blacklist", "", "Path to file containing list of blacklisted domains, which will be excluded from the configuration even if present in the domains file (e.g. blacklist.txt)")
-	proxiedSitesDir = flag.String("proxiedsites", "proxiedsites", "Path to directory containing proxied site lists, which will be combined and proxied by Lantern")
-	minFreq         = flag.Float64("minfreq", 3.0, "Minimum frequency (percentage) for including CA cert in list of trusted certs, defaults to 3.0%")
+	help                      = flag.Bool("help", false, "Get usage help")
+	domainsFile               = flag.String("domains", "", "Path to file containing list of domains to use, with one domain per line (e.g. domains.txt)")
+	blacklistFile             = flag.String("blacklist", "", "Path to file containing list of blacklisted domains, which will be excluded from the configuration even if present in the domains file (e.g. blacklist.txt)")
+	proxiedSitesDir           = flag.String("proxiedsites", "proxiedsites", "Path to directory containing proxied site lists, which will be combined and proxied by Lantern")
+	proxiedSitesBlacklistFile = flag.String("proxiedsitesblacklist", "proxiedsitesblacklist.txt", "File containing sites that are never to be included in the proxiedsites list")
+	minFreq                   = flag.Float64("minfreq", 3.0, "Minimum frequency (percentage) for including CA cert in list of trusted certs, defaults to 3.0%")
 )
 
 var (
@@ -37,8 +38,9 @@ var (
 
 	domains []string
 
-	blacklist    = make(filter)
-	proxiedSites = make(filter)
+	blacklist             = make(filter)
+	proxiedSites          = make(filter)
+	proxiedSitesBlacklist = make(filter)
 
 	domainsCh     = make(chan string)
 	masqueradesCh = make(chan *masquerade)
@@ -72,8 +74,9 @@ func main() {
 	runtime.GOMAXPROCS(numcores)
 
 	loadDomains()
-	loadProxiedSitesList()
 	loadBlacklist()
+	loadProxiedSitesBlacklist()
+	loadProxiedSitesList()
 
 	masqueradesTmpl := loadTemplate("masquerades.go.tmpl")
 	proxiedSitesTmpl := loadTemplate("proxiedsites.go.tmpl")
@@ -108,6 +111,48 @@ func loadDomains() {
 	domains = strings.Split(string(domainsBytes), "\n")
 }
 
+func loadBlacklist() {
+	if *blacklistFile == "" {
+		log.Error("Please specify a blacklist file")
+		flag.Usage()
+		os.Exit(3)
+	}
+	blacklistBytes, err := ioutil.ReadFile(*blacklistFile)
+	if err != nil {
+		log.Fatalf("Unable to read blacklist file at %s: %s", *blacklistFile, err)
+	}
+	for _, domain := range strings.Split(string(blacklistBytes), "\n") {
+		blacklist[domain] = true
+	}
+}
+
+func loadProxiedSitesBlacklist() {
+	if *proxiedSitesBlacklistFile == "" {
+		log.Debug("No proxiedsitesblacklist")
+		return
+	}
+	blacklistBytes, err := ioutil.ReadFile(*proxiedSitesBlacklistFile)
+	if err != nil {
+		log.Fatalf("Unable to read proxiedsitesblacklist file at %s: %s", *proxiedSitesBlacklistFile, err)
+	}
+	for _, domain := range strings.Split(string(blacklistBytes), "\n") {
+		proxiedSitesBlacklist[domain] = true
+	}
+}
+
+func loadProxiedSitesList() {
+	if *proxiedSitesDir == "" {
+		log.Error("Please specify a proxied site directory")
+		flag.Usage()
+		os.Exit(3)
+	}
+
+	err := filepath.Walk(*proxiedSitesDir, loadProxiedSites)
+	if err != nil {
+		log.Errorf("Could not open proxied site directory: %s", err)
+	}
+}
+
 // Scans the proxied site directory and stores the sites in the files found
 func loadProxiedSites(path string, info os.FileInfo, err error) error {
 	if info.IsDir() {
@@ -125,39 +170,11 @@ func loadProxiedSites(path string, info os.FileInfo, err error) error {
 		// to avoid proxying sites that are already unblocked there.
 		// This is a general problem when you aren't maintaining country-specific whitelists
 		// which will be addressed in the next phase
-		if domain != "" && !strings.HasPrefix(domain, "#") && !strings.HasSuffix(domain, ".ir") {
+		if domain != "" && !strings.HasPrefix(domain, "#") && !strings.HasSuffix(domain, ".ir") && !proxiedSitesBlacklist[domain] {
 			proxiedSites[domain] = true
 		}
 	}
 	return err
-}
-
-func loadProxiedSitesList() {
-	if *proxiedSitesDir == "" {
-		log.Error("Please specify a proxied site directory")
-		flag.Usage()
-		os.Exit(3)
-	}
-
-	err := filepath.Walk(*proxiedSitesDir, loadProxiedSites)
-	if err != nil {
-		log.Errorf("Could not open proxied site directory: %s", err)
-	}
-}
-
-func loadBlacklist() {
-	if *blacklistFile == "" {
-		log.Error("Please specify a blacklist file")
-		flag.Usage()
-		os.Exit(3)
-	}
-	blacklistBytes, err := ioutil.ReadFile(*blacklistFile)
-	if err != nil {
-		log.Fatalf("Unable to read blacklist file at %s: %s", *blacklistFile, err)
-	}
-	for _, domain := range strings.Split(string(blacklistBytes), "\n") {
-		blacklist[domain] = true
-	}
 }
 
 func loadTemplate(name string) string {
