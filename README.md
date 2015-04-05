@@ -136,6 +136,8 @@ SECRETS_DIR=$PATH_TO_TOO_MANY_SECRETS BNS_CERT_PASS='***' \
 VERSION=2.0.0-beta1 make package-windows
 ```
 
+Windows binary will be checked against https://www.virustotal.com for any virus before packaging.
+
 ### Packaging for Ubuntu
 
 Lantern on Ubuntu is distributed as a `.deb` package. You can generate a Debian

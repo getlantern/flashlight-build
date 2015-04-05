@@ -194,10 +194,19 @@ darwin-amd64:
 		$(call build-tags) && \
 		CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -o lantern_darwin_amd64 -tags="$$BUILD_TAGS" -ldflags="$(LDFLAGS)" github.com/getlantern/flashlight && \
 		cat lantern_darwin_amd64 | bzip2 > update_darwin_amd64.bz2 && \
-		ls -l lantern_darwin_amd64 update_darwin_amd64.bz2 \
+		ls -l lantern_darwin_amd64 update_darwin_amd64.bz2; \
 	else \
 		echo "-> Skipped: Can not compile Lantern for OSX on a non-OSX host."; \
-	fi;
+	fi
+
+check-virus-windows:
+	@echo "Checking virus for windows/386 binary, several minutes required, please patient..." && \
+	if [[ -z "$$SECRETS_DIR" ]]; then echo "SECRETS_DIR environment value is required."; exit 1; fi && \
+	VIRUSTOTAL_API_KEY_FILE=$$SECRETS_DIR/virustotal_api_key && \
+	if [[ ! -f "$$VIRUSTOTAL_API_KEY_FILE" ]]; then echo "File $$VIRUSTOTAL_API_KEY_FILE does not exist"; exit 1; fi && \
+	VIRUSTOTAL_API_KEY=`cat $$VIRUSTOTAL_API_KEY_FILE` && \
+	$(call docker-up) && \
+	docker run -v $$PWD:/flashlight-build -t $(DOCKER_IMAGE_TAG) /bin/bash -c 'python /virustotal/virustotal.py --key "$(VIRUSTOTAL_API_KEY)" scan /flashlight-build/lantern_windows_386.exe'
 
 package-linux-386: require-version linux-386
 	@echo "Generating distribution package for linux/386..." && \
@@ -211,7 +220,7 @@ package-linux-amd64: require-version linux-amd64
 
 package-linux: require-version package-linux-386 package-linux-amd64
 
-package-windows: require-version windows-386
+package-windows: require-version windows-386 check-virus-windows
 	@echo "Generating distribution package for windows/386..." && \
 	if [[ -z "$$SECRETS_DIR" ]]; then echo "SECRETS_DIR environment value is required."; exit 1; fi && \
 	if [[ -z "$$BNS_CERT_PASS" ]]; then echo "BNS_CERT_PASS environment value is required."; exit 1; fi && \
@@ -246,7 +255,7 @@ package-darwin: require-version darwin
 
 binaries: docker genassets linux windows darwin
 
-packages: require-version require-secrets clean binaries package-windows package-linux package-darwin
+packages: require-version require-secrets clean binaries package-windows package-linux package-darwin 
 
 clean:
 	@rm -f lantern_linux*

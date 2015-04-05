@@ -69,6 +69,9 @@ RUN yum install -y osslsigncode mingw32-nsis && yum clean all
 RUN yum install -y nodejs npm && yum clean all
 RUN npm install -g gulp
 
+# https://www.virustotal.com API tool, requisites for check-virus-windows
+RUN git clone https://github.com/Gawen/virustotal.git /virustotal
+
 # Expect the $WORKDIR volume to be mounted.
 ENV SECRETS /secrets
 
