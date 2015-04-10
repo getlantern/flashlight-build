@@ -141,9 +141,13 @@ func (g *ReleaseManager) CheckForUpdate(p *Params) (res *Result, err error) {
 	// Generate a binary diff of the two assets.
 	var patch *Patch
 	log.Debugf("Generating patch")
+
 	if patch, err = GeneratePatch(current.URL, update.URL); err != nil {
+		log.Debugf("Unable to generate patch: %q", err)
 		return nil, fmt.Errorf("Unable to generate patch: %q", err)
 	}
+
+	log.Debugf("Patch was generated.")
 
 	// Generate result.
 	r := &Result{

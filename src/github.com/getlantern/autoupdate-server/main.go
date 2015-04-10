@@ -49,6 +49,7 @@ func backgroundUpdate() {
 }
 
 func (u *updateHandler) closeWithStatus(w http.ResponseWriter, status int) {
+	log.Debugf("closeWithStatus %d", status)
 	w.WriteHeader(status)
 	w.Write([]byte(http.StatusText(status)))
 }
@@ -72,6 +73,7 @@ func (u *updateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			log.Debugf("CheckForUpdate failed with error: %q", err)
 			if err == server.ErrNoUpdateAvailable {
 				u.closeWithStatus(w, http.StatusNoContent)
+				return
 			}
 			u.closeWithStatus(w, http.StatusExpectationFailed)
 			return
@@ -88,9 +90,12 @@ func (u *updateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		log.Tracef("JSON response: %s\n", string(content))
+
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(content)
+
 		return
 	}
 	u.closeWithStatus(w, http.StatusNotFound)
