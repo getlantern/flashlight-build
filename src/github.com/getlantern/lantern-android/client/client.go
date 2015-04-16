@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/getlantern/analytics"
+	"github.com/getlantern/detour"
 	"github.com/getlantern/flashlight/client"
 	"github.com/getlantern/flashlight/globals"
 	"github.com/getlantern/flashlight/util"
@@ -36,6 +37,9 @@ func init() {
 		// error without stopping the program.
 		log.Printf("Error updating configuration over the network: %q.", err)
 	}
+
+	detour.AddToWl("twitter.com:443", true)
+	detour.AddToWl("twimg.com:443", true)
 }
 
 // NewClient creates a proxy client.
